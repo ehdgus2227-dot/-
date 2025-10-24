@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>클라우드 연동 주식 포트폴리오</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .card { background-color: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .btn { @apply px-4 py-2 rounded-lg font-semibold text-white shadow-md transition-all duration-300; }
+        .btn-primary { @apply bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50; }
+        .btn-secondary { @apply bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50; }
+        .signal-buy { color: #10b981; }
+        .signal-sell { color: #ef4444; }
+        .signal-hold { color: #6b7280; }
+        .loader { border: 4px solid #f3f4f6; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; position: fixed; top: 50%; left: 50%; margin-top: -20px; margin-left: -20px; z-index: 100; display: none; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: none; justify-content: center; align-items: center; z-index: 998; }
+        .modal-content { background: white; padding: 2rem; border-radius: 0.5rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 90%; max-width: 400px; text-align: center; z-index: 999; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">클라우드 연동 주식 포트폴리오</h1>
+            <p class="text-gray-600 mt-2">PC와 모바일에서 실시간 동기화됩니다.</p>
+        </header>
+
+        <!-- API 키 설정 -->
+        <div class="card p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">설정: Alpha Vantage API 키</h2>
+            <p class="text-sm text-gray-600 mb-3">
+                <a href="https://www.alphavantage.co/support/#api-key" target="_blank" class="text-blue-600 hover:underline">무료 API 키 발급</a>
+                (API 키는 PC/모바일 브라우저에 각각 한 번씩 저장해야 합니다.)
+            </p>
+            <div class="flex gap-4">
+                <input type="text" id="apiKeyInput" placeholder="API 키를 입력하세요" class="flex-grow mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                <button id="saveApiKeyButton" class="btn btn-secondary self-start mt-1">저장</button>
+            </div>
+        </div>
+
+        <!-- 포트폴리오 추가 폼 -->
+        <div class="card p-6 mb-8">
+             <h2 class="text-xl font-semibold mb-4">새 주식 추가</h2>
+             <form id="addStockForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label for="stockSymbol" class="block text-sm font-medium text-gray-700">주식 티커 (예: AAPL)</label>
+                    <input type="text" id="stockSymbol" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required>
+                </div>
+                <div>
+                    <label for="stockQuantity" class="block text-sm font-medium text-gray-700">보유 수량</label>
+                    <input type="number" id="stockQuantity" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required min="0">
+                </div>
+                <div>
+                    <label for="purchasePrice" class="block text-sm font-medium text-gray-700">평균 매수 가격 (USD)</label>
+                    <input type="number" id="purchasePrice" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required min="0" step="0.01">
+                </div>
+                <div class="md:self-end">
+                    <button type="submit" class="btn btn-primary w-full md:w-auto">포트폴리오에 추가</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 내 포트폴리오 -->
+        <div>
+            <h2 class="text-2xl font-semibold mb-4">내 포트폴리오</h2>
+            <div id="portfolioList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- 포트폴리오 아이템이 여기에 동적으로 추가됩니다 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 로딩 스피너 -->
+    <div id="loader" class="loader"></div>
+
+    <!-- 커스텀 메시지 모달 -->
+    <div id="messageModal" class="modal-overlay">
+        <div class="modal-content">
+            <p id="modalMessage" class="text-lg mb-4"></p>
+            <button id="closeModal" class="btn btn-primary">확인</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK 및 앱 로직 -->
+    <script type="module">
+        // Firebase SDK 임포트
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            doc, 
+            addDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            query,
+            setLogLevel
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // =======================================================================
+        // ▼▼▼ 1단계에서 복사한 firebaseConfig 내용을 여기에 붙여넣으세요 ▼▼▼
+        // =======================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyA9lpUIE3rCTdV51ZEtGH6B5yZr_VVDdT4",
+    authDomain: "donghyeon2227.firebaseapp.com",
+    projectId: "donghyeon2227",
+    storageBucket: "donghyeon2227.firebasestorage.app",
+    messagingSenderId: "60070026183",
+    appId: "1:60070026183:web:2ae226006cb3b0b1be57e2",
+    measurementId: "G-KT8PVSSHPM"// apiKey: "...",
+            // authDomain: "...",
+            // projectId: "...",
+            // storageBucket: "...",
+            // messagingSenderId: "...",
+            // appId: "..."
+            // 여기에 붙여넣기
+        };
+        // =======================================================================
+
+        // --- 전역 변수 및 DOM 요소 ---
+        let app, auth, db, userId, portfolioCollectionRef;
+        let userApiKey = null;
+        const apiKeyStorageKey = 'alphaVantageApiKey'; // API 키는 로컬 브라우저에 저장
+
+        const addStockForm = document.getElementById('addStockForm');
+        const stockSymbolInput = document.getElementById('stockSymbol');
+        const stockQuantityInput = document.getElementById('stockQuantity');
+        const purchasePriceInput = document.getElementById('purchasePrice');
+        const portfolioList = document.getElementById('portfolioList');
+        const loader = document.getElementById('loader');
+        const messageModal = document.getElementById('messageModal');
+        const modalMessage = document.getElementById('modalMessage');
+        const closeModal = document.getElementById('closeModal');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const saveApiKeyButton = document.getElementById('saveApiKeyButton');
+
+        // --- 로더, 모달, API 키 관리 (이전과 동일) ---
+        function showLoader() { loader.style.display = 'block'; }
+        function hideLoader() { loader.style.display = 'none'; }
+        function showModal(message) {
+            modalMessage.textContent = message;
+            messageModal.style.display = 'flex';
+        }
+        closeModal.addEventListener('click', () => {
+            messageModal.style.display = 'none';
+        });
+
+        function saveApiKey() {
+            const key = apiKeyInput.value.trim();
+            if (key) {
+                localStorage.setItem(apiKeyStorageKey, key);
+                userApiKey = key;
+                showModal("API 키가 저장되었습니다.");
+            } else {
+                showModal("API 키를 입력하세요.");
+            }
+        }
+
+        function loadApiKey() {
+            const key = localStorage.getItem(apiKeyStorageKey);
+            if (key) {
+                userApiKey = key;
+                apiKeyInput.value = key;
+            }
+        }
+
+        // --- Alpha Vantage API 호출 (이전과 동일) ---
+        async function fetchRealStockData(symbol) {
+            if (!userApiKey) {
+                showModal("Alpha Vantage API 키를 먼저 '설정'에서 입력하고 저장해주세요.");
+                return null;
+            }
+            const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${userApiKey}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`API 요청 실패: ${response.statusText}`);
+                const data = await response.json();
+                if (data["Error Message"]) throw new Error(`API 오류: ${data["Error Message"]}`);
+                if (data["Information"]) throw new Error("API 호출 한도 도달. 잠시 후 시도하세요.");
+                const timeSeries = data["Time Series (Daily)"];
+                if (!timeSeries) throw new Error("유효한 시계열 데이터가 없습니다.");
+                
+                const latestDate = Object.keys(timeSeries)[0];
+                const latestClosePrice = parseFloat(timeSeries[latestDate]["4. close"]);
+                const historicalPrices = Object.keys(timeSeries)
+                    .map(date => parseFloat(timeSeries[date]["4. close"]))
+                    .reverse();
+                
+                return { symbol, currentPrice: latestClosePrice, historicalPrices };
+            } catch (error) {
+                console.error(`[${symbol}] 데이터 오류:`, error);
+                // 오류 모달을 띄우되, 렌더링을 위해 오류 객체 반환
+                showModal(`[${symbol}] 데이터 오류: ${error.message}`);
+                return { error: true, symbol, message: error.message };
+            }
+        }
+
+        // --- 기술적 지표 계산 함수 (이전과 동일) ---
+        function calculateSMA(data, period) { if (data.length < period) return null; return data.slice(-period).reduce((a, b) => a + b, 0) / period; }
+        function calculateEMA(data, period) { if (data.length < period) return []; const k = 2 / (period + 1); let emaData = [data.slice(0, period).reduce((a, b) => a + b, 0) / period]; for(let i = period; i < data.length; i++) { emaData.push((data[i] * k) + (emaData[emaData.length - 1] * (1 - k))); } return emaData; }
+        function calculateStdDev(data, period) { const slice = data.slice(-period); if (slice.length < period) return null; const sma = calculateSMA(slice, period); if (sma === null) return null; return Math.sqrt(slice.reduce((a, b) => a + Math.pow(b - sma, 2), 0) / period); }
+        function calculateBollingerBands(data, period = 20, stdDevMultiplier = 2) { if (data.length < period) return { middle: null, upper: null, lower: null }; const sma = calculateSMA(data, period); const stdDev = calculateStdDev(data, period); if (sma === null || stdDev === null) return { middle: null, upper: null, lower: null }; return { middle: sma, upper: sma + (stdDev * stdDevMultiplier), lower: sma - (stdDev * stdDevMultiplier) }; }
+        function calculateRSI(data, period = 14) { if (data.length <= period) return null; let gains = 0; let losses = 0; for (let i = data.length - period; i < data.length; i++) { const change = data[i] - data[i-1]; if (change > 0) { gains += change; } else { losses -= change; } } let avgGain = gains / period; let avgLoss = losses / period; if (avgLoss === 0) return 100; const rs = avgGain / avgLoss; return 100 - (100 / (1 + rs)); }
+        function calculateMACD(data, shortPeriod = 12, longPeriod = 26, signalPeriod = 9) { if (data.length < longPeriod) return { macd: null, signal: null, histogram: null }; const emaShortAll = calculateEMA(data, shortPeriod); const emaLongAll = calculateEMA(data, longPeriod); const macdLineData = emaShortAll.slice(emaShortAll.length - emaLongAll.length).map((val, idx) => val - emaLongAll[idx]); if (macdLineData.length < signalPeriod) return { macd: null, signal: null, histogram: null }; const signalLineData = calculateEMA(macdLineData, signalPeriod); const latestMacd = macdLineData[macdLineData.length - 1]; const latestSignal = signalLineData[signalLineData.length - 1]; return { macd: latestMacd, signal: latestSignal, histogram: latestMacd - latestSignal }; }
+        function getTradingSignal(stockData) { const prices = stockData.historicalPrices; const currentPrice = stockData.currentPrice; if (prices.length < 26) return { signal: '데이터 부족', signalClass: 'signal-hold', recommendation: { type: 'N/A', price: null } }; const bb = calculateBollingerBands(prices); const rsi = calculateRSI(prices); const macd = calculateMACD(prices); let buySignals = 0, sellSignals = 0; let recommendedAction = { type: 'N/A', price: null }; if (bb.lower && currentPrice < bb.lower) { buySignals++; recommendedAction = { type: '매수 추천 (BB 하단)', price: bb.lower.toFixed(2) }; } if (bb.upper && currentPrice > bb.upper) { sellSignals++; recommendedAction = { type: '매도 추천 (BB 상단)', price: bb.upper.toFixed(2) }; } if (rsi !== null && rsi < 30) { buySignals++; if (recommendedAction.type === 'N/A') recommendedAction = { type: '매수 고려 (RSI 과매도)', price: currentPrice.toFixed(2) }; } if (rsi !== null && rsi > 70) { sellSignals++; if (recommendedAction.type === 'N/A') recommendedAction = { type: '매도 고려 (RSI 과매수)', price: currentPrice.toFixed(2) }; } if (macd.histogram !== null && macd.histogram > 0) buySignals++; if (macd.histogram !== null && macd.histogram < 0) sellSignals++; if (buySignals > sellSignals && buySignals >= 1) return { signal: '매수 (Buy)', signalClass: 'signal-buy', recommendation: recommendedAction }; else if (sellSignals > buySignals && sellSignals >= 1) return { signal: '매도 (Sell)', signalClass: 'signal-sell', recommendation: recommendedAction }; else return { signal: '보유 (Hold)', signalClass: 'signal-hold', recommendation: { type: '관망', price: null } }; }
+
+        // --- 포트폴리오 렌더링 (Firestore 기반) ---
+        async function renderPortfolio(doc) {
+            const stock = doc.data();
+            const stockId = doc.id;
+            
+            showLoader(); // 데이터 가져오기 시작
+            const stockData = await fetchRealStockData(stock.symbol);
+            hideLoader(); // 데이터 가져오기 완료
+
+            let cardHtml;
+
+            if (!stockData || stockData.error) {
+                cardHtml = `
+                    <button class="absolute top-3 right-3 text-gray-400 hover:text-red-500 font-bold remove-stock" data-id="${stockId}">X</button>
+                    <h3 class="text-xl font-bold text-red-700">${stock.symbol.toUpperCase()}</h3>
+                    <p class="text-red-600 mt-4">데이터를 불러오는데 실패했습니다.</p>
+                    <p class="text-sm text-gray-600">${stockData ? stockData.message : 'API 키를 확인하세요.'}</p>
+                `;
+            } else {
+                const tradingSignal = getTradingSignal(stockData);
+                const currentPrice = stockData.currentPrice;
+                const totalValue = currentPrice * stock.quantity;
+                const purchaseValue = stock.purchasePrice * stock.quantity;
+                const gainLoss = totalValue - purchaseValue;
+                const gainLossPercent = (purchaseValue === 0) ? 0 : (gainLoss / purchaseValue) * 100;
+                const gainLossClass = gainLoss >= 0 ? 'text-green-600' : 'text-red-600';
+
+                cardHtml = `
+                    <button class="absolute top-3 right-3 text-gray-400 hover:text-red-500 font-bold remove-stock" data-id="${stockId}">X</button>
+                    <h3 class="text-xl font-bold text-blue-700">${stock.symbol.toUpperCase()}</h3>
+                    <p class="text-sm text-gray-500 mb-4">수량: ${stock.quantity}</p>
+                    <div class="space-y-2 mb-4">
+                        <div class="flex justify-between"><span class="text-gray-600">평균 매수가:</span><span class="font-medium">$${stock.purchasePrice.toFixed(2)}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-600">현재가 (전일 종가):</span><span class="font-medium">$${currentPrice.toFixed(2)}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-600">평가손익:</span><span class="font-medium ${gainLossClass}">$${gainLoss.toFixed(2)} (${gainLossPercent.toFixed(2)}%)</span></div>
+                        <div class="flex justify-between"><span class="text-gray-600">총 평가금액:</span><span class="font-medium">$${totalValue.toFixed(2)}</span></div>
+                    </div>
+                    <div class="border-t pt-4">
+                        <div class="flex justify-between items-center mb-2"><span class="text-gray-600">매매 신호 (일봉):</span><span class="font-bold text-lg ${tradingSignal.signalClass}">${tradingSignal.signal}</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-600">추천 행동 (${tradingSignal.recommendation.type}):</span><span class="font-medium">${tradingSignal.recommendation.price ? '$' + tradingSignal.recommendation.price : 'N/A'}</span></div>
+                    </div>
+                `;
+            }
+
+            // 기존 카드 찾기 및 업데이트/추가
+            let card = portfolioList.querySelector(`[data-id="${stockId}"]`);
+            if (!card) {
+                card = document.createElement('div');
+                card.className = 'card p-5 relative';
+                card.setAttribute('data-id', stockId);
+                portfolioList.appendChild(card);
+            }
+            card.innerHTML = cardHtml;
+
+            // 삭제 버튼 이벤트 리스너 추가
+            card.querySelector('.remove-stock').addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeStock(e.target.dataset.id);
+            });
+        }
+
+        // --- Firestore 상호작용 ---
+        async function addStock(e) {
+            e.preventDefault();
+            if (!userApiKey) { showModal("API 키를 먼저 설정하고 저장해주세요."); return; }
+            const symbol = stockSymbolInput.value.trim().toUpperCase();
+            const quantity = parseFloat(stockQuantityInput.value);
+            const price = parseFloat(purchasePriceInput.value);
+            if (!symbol || isNaN(quantity) || isNaN(price) || quantity < 0 || price < 0) { showModal("유효한 주식 티커, 수량, 가격을 입력하세요."); return; }
+
+            showLoader();
+            try {
+                // 티커 유효성 검사
+                const testData = await fetchRealStockData(symbol);
+                if (!testData || testData.error) {
+                    // showModal은 fetchRealStockData 내부에서 이미 호출됨
+                    hideLoader();
+                    return;
+                }
+                
+                await addDoc(portfolioCollectionRef, {
+                    symbol: symbol,
+                    quantity: quantity,
+                    purchasePrice: price,
+                    userId: userId // 이 userId로 데이터를 구분
+                });
+                stockSymbolInput.value = '';
+                stockQuantityInput.value = '';
+                purchasePriceInput.value = '';
+            } catch (error) {
+                console.error("주식 추가 오류:", error);
+                showModal("주식 추가 중 오류가 발생했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function removeStock(id) {
+            if (!window.confirm("정말로 이 주식을 포트폴리오에서 삭제하시겠습니까?")) return;
+            showLoader();
+            try {
+                const docRef = doc(db, portfolioCollectionRef.path, id);
+                await deleteDoc(docRef);
+                showModal("주식이 삭제되었습니다.");
+            } catch (error) {
+                console.error("주식 삭제 오류:", error);
+                showModal("주식 삭제 중 오류가 발생했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // --- 앱 시작 ---
+        async function initializeAppLogic() {
+            loadApiKey(); // 로컬 브라우저에서 API 키 로드
+
+            if (!firebaseConfig || !firebaseConfig.apiKey) {
+                showModal("Firebase 설정이 누락되었습니다. 코드의 firebaseConfig 변수를 확인하세요.");
+                return;
+            }
+
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('Debug');
+
+                showLoader();
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("익명 인증 성공, UserId:", userId);
+                        
+                        // 사용자별 고유 컬렉션 경로
+                        // 중요: 이 경로는 Canvas 환경과 다릅니다. (더 간단함)
+                        const collectionPath = `users/${userId}/portfolio`;
+                        portfolioCollectionRef = collection(db, collectionPath);
+                        
+                        // 포트폴리오 실시간 감시
+                        const q = query(portfolioCollectionRef);
+                        onSnapshot(q, (snapshot) => {
+                            hideLoader();
+                            
+                            if (snapshot.empty) {
+                                portfolioList.innerHTML = '<p class="text-gray-500 col-span-full">포트폴리오가 비어있습니다. 새 주식을 추가하세요.</p>';
+                            }
+
+                            // 변경사항 감지
+                            snapshot.docChanges().forEach((change) => {
+                                const doc = change.doc;
+                                if (change.type === "added" || change.type === "modified") {
+                                    renderPortfolio(doc);
+                                }
+                                if (change.type === "removed") {
+                                    const cardToRemove = portfolioList.querySelector(`[data-id="${doc.id}"]`);
+                                    if (cardToRemove) cardToRemove.remove();
+                                }
+                            });
+                        }, (error) => {
+                            console.error("onSnapshot 오류:", error);
+                            showModal("포트폴리오 로딩 중 오류 발생.");
+                            hideLoader();
+                        });
+
+                        addStockForm.addEventListener('submit', addStock);
+
+                    } else {
+                        // 익명으로 로그인 시도
+                        console.log("익명 로그인 시도 중...");
+                        await signInAnonymously(auth);
+                    }
+                }, (error) => {
+                    console.error("Auth 상태 변경 오류:", error);
+                    showModal("인증 중 오류가 발생했습니다.");
+                    hideLoader();
+                });
+            } catch (error) {
+                console.error("Firebase 초기화 오류:", error);
+                showModal("앱 초기화 중 심각한 오류가 발생했습니다.");
+                hideLoader();
+            }
+        }
+
+        // DOM이 로드된 후 앱 시작
+        document.addEventListener('DOMContentLoaded', initializeAppLogic);
+    </script>
+</body>
+</html>
