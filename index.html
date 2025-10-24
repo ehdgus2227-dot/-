@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>클라우드 연동 주식 포트폴리오 (v3)</title>
+    <title>클라우드 연동 주식 포트폴리오 (v4)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -31,7 +31,7 @@
     <div class="max-w-6xl mx-auto">
         <header class="mb-8">
             <h1 class="text-3xl font-bold text-gray-900">클라우드 연동 주식 포트폴리오</h1>
-            <p class="text-gray-600 mt-2">PC와 모바일에서 실시간 동기화됩니다. (v3 - 검색 기능)</p>
+            <p class="text-gray-600 mt-2">PC와 모바일에서 실시간 동기화됩니다. (v4 - 버그 수정)</p>
         </header>
 
         <!-- API 키 설정 -->
@@ -45,6 +45,9 @@
                 <input type="text" id="apiKeyInput" placeholder="API 키를 입력하세요" class="flex-grow mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                 <button id="saveApiKeyButton" class="btn btn-secondary self-start mt-1">저장</button>
             </div>
+            <p class="text-xs text-gray-500 mt-2">
+                *참고: '시크릿 모드'나 '프라이빗 브라우징'에서는 API 키가 저장되지 않을 수 있습니다.
+            </p>
         </div>
 
         <!-- 포트폴리오 추가 폼 -->
@@ -114,16 +117,17 @@
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =======================================================================
-        // ▼▼▼ 1단계에서 복사한 firebaseConfig 내용을 여기에 붙여넣으세요 ▼▼▼
+        // ▼▼▼ Firebase 콘솔에서 복사한 firebaseConfig 내용을 여기에 붙여넣으세요 ▼▼▼
         // =======================================================================
         const firebaseConfig = {
-            // apiKey: "...",
-            // authDomain: "...",
-            // projectId: "...",
-            // storageBucket: "...",
-            // messagingSenderId: "...",
-            // appId: "..."
-            // 여기에 본인의 Firebase Config를 붙여넣으세요
+            apiKey: "AIzaSya9lPUIE3rCTdV51ZEt6H6B5yZr_VddT4",
+            authDomain: "donghyeon2227.firebaseapp.com",
+            projectId: "donghyeon2227",
+            storageBucket: "donghyeon2227.firebaseapp.com",
+            messagingSenderId: "60070026183",
+            appId: "1:60070026183:web:2ae226006cb3b0b1be57e2",
+            measurementId: "G-KT8PVSSHPM"
+            // (참고: 기존 플레이스홀더 주석을 정리했습니다.)
         };
         // =======================================================================
 
@@ -158,57 +162,54 @@
         });
 
         function saveApiKey() {
-            const key = apiKeyInput.value.trim();
-            if (key) {
-                localStorage.setItem(apiKeyStorageKey, key);
-                userApiKey = key;
-                showModal("API 키가 저장되었습니다.");
-            } else {
-                showModal("API 키를 입력하세요.");
+            try {
+                const key = apiKeyInput.value.trim();
+                if (key) {
+                    localStorage.setItem(apiKeyStorageKey, key); // 이 시점에서 오류가 날 수 있음 (예: 시크릿 모드)
+                    userApiKey = key; // Updates the global variable
+                    showModal("API 키가 저장되었습니다.");
+                } else {
+                    showModal("API 키를 입력하세요.");
+                }
+            } catch (error) {
+                console.error("API 키 저장 실패:", error);
+                showModal("API 키를 저장하지 못했습니다. 브라우저가 시크릿 모드는 아닌지 확인해주세요.");
             }
         }
 
         function loadApiKey() {
-            const key = localStorage.getItem(apiKeyStorageKey);
-            if (key) {
-                userApiKey = key;
-                apiKeyInput.value = key;
+            try {
+                const key = localStorage.getItem(apiKeyStorageKey);
+                if (key) {
+                    userApiKey = key;
+                    apiKeyInput.value = key; // Puts the key back in the input box
+                }
+            } catch (error) {
+                console.warn("API 키 로드 실패:", error);
+                // 로드 실패는 치명적이지 않으므로 모달을 띄우지 않음
             }
         }
 
-        // --- Alpha Vantage API 호출 ---
-
+        // --- Alpha Vantage API 호출 (이전과 동일) ---
         // (신규) 티커 검색 API
         async function fetchTickerSearch(query) {
-            if (!userApiKey) {
-                // 이 함수는 조용히 실패 (모달 팝업 없음)
-                console.warn("API 키가 없어 티커 검색을 건너뜁니다.");
-                return null;
-            }
+            if (!userApiKey) { console.warn("API 키가 없어 티커 검색을 건너뜁니다."); return null; }
             if (query.length < 1) return null;
-
             const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${query}&apikey=${userApiKey}`;
             try {
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('API 응답 실패');
                 const data = await response.json();
-                if (data["Error Message"] || data["Information"]) {
-                     console.warn("티커 검색 API 오류 또는 한도 도달:", data["Error Message"] || data["Information"]);
-                     return null; // 오류 시 조용히 실패
-                }
+                if (data["Error Message"] || data["Information"]) { console.warn("티커 검색 API 오류 또는 한도 도달:", data["Error Message"] || data["Information"]); return null; }
                 return data.bestMatches || [];
             } catch (error) {
                 console.error("티커 검색 실패:", error);
                 return null;
             }
         }
-
         // (기존) 일일 데이터 API
         async function fetchRealStockData(symbol) {
-            if (!userApiKey) {
-                showModal("Alpha Vantage API 키를 먼저 '설정'에서 입력하고 저장해주세요.");
-                return null;
-            }
+            if (!userApiKey) { showModal("Alpha Vantage API 키를 먼저 '설정'에서 입력하고 저장해주세요."); return null; }
             const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${userApiKey}`;
             try {
                 const response = await fetch(url);
@@ -218,17 +219,12 @@
                 if (data["Information"]) throw new Error("API 호출 한도 도달. 잠시 후 시도하세요.");
                 const timeSeries = data["Time Series (Daily)"];
                 if (!timeSeries) throw new Error("유효한 시계열 데이터가 없습니다.");
-                
                 const latestDate = Object.keys(timeSeries)[0];
                 const latestClosePrice = parseFloat(timeSeries[latestDate]["4. close"]);
-                const historicalPrices = Object.keys(timeSeries)
-                    .map(date => parseFloat(timeSeries[date]["4. close"]))
-                    .reverse();
-                
+                const historicalPrices = Object.keys(timeSeries).map(date => parseFloat(timeSeries[date]["4. close"])).reverse();
                 return { symbol, currentPrice: latestClosePrice, historicalPrices };
             } catch (error) {
                 console.error(`[${symbol}] 데이터 오류:`, error);
-                // 오류 모달을 띄우되, 렌더링을 위해 오류 객체 반환
                 showModal(`[${symbol}] 데이터 오류: ${error.message}`);
                 return { error: true, symbol, message: error.message };
             }
@@ -248,10 +244,9 @@
             const stock = doc.data();
             const stockId = doc.id;
             
-            // 주식 데이터를 가져오는 동안 로더를 표시
             showLoader(); 
             const stockData = await fetchRealStockData(stock.symbol);
-            hideLoader(); // 데이터 가져오기 완료
+            hideLoader(); 
 
             let cardHtml;
 
@@ -298,7 +293,6 @@
                 `;
             }
 
-            // 기존 카드 찾기 및 업데이트/추가
             let card = portfolioList.querySelector(`[data-id="${stockId}"]`);
             if (!card) {
                 card = document.createElement('div');
@@ -307,38 +301,31 @@
                 portfolioList.appendChild(card);
             }
             card.innerHTML = cardHtml;
-
-            // 삭제 버튼 이벤트 리스너 추가
             card.querySelector('.remove-stock').addEventListener('click', (e) => {
                 e.stopPropagation();
                 removeStock(e.target.dataset.id);
             });
         }
 
-        // --- Firestore 상호작용 ---
+        // --- Firestore 상호작용 (이전과 동일) ---
         async function addStock(e) {
             e.preventDefault();
+            if (!userId) { showModal("데이터베이스에 연결되지 않았습니다. 잠시 후 다시 시도하세요."); return; }
             if (!userApiKey) { showModal("API 키를 먼저 설정하고 저장해주세요."); return; }
             const symbol = stockSymbolInput.value.trim().toUpperCase();
             const quantity = parseFloat(stockQuantityInput.value);
             const price = parseFloat(purchasePriceInput.value);
             if (!symbol || isNaN(quantity) || isNaN(price) || quantity < 0 || price < 0) { showModal("유효한 주식 티커, 수량, 가격을 입력하세요."); return; }
-
+            
             showLoader();
             try {
-                // 티커 유효성 검사
                 const testData = await fetchRealStockData(symbol);
-                if (!testData || testData.error) {
-                    // showModal은 fetchRealStockData 내부에서 이미 호출됨
-                    hideLoader();
-                    return;
-                }
-                
+                if (!testData || testData.error) { hideLoader(); return; }
                 await addDoc(portfolioCollectionRef, {
                     symbol: symbol,
                     quantity: quantity,
                     purchasePrice: price,
-                    userId: userId // 이 userId로 데이터를 구분
+                    userId: userId 
                 });
                 stockSymbolInput.value = '';
                 stockQuantityInput.value = '';
@@ -350,7 +337,6 @@
                 hideLoader();
             }
         }
-
         async function removeStock(id) {
             if (!window.confirm("정말로 이 주식을 포트폴리오에서 삭제하시겠습니까?")) return;
             showLoader();
@@ -369,42 +355,30 @@
         // --- (신규) 티커 검색 핸들러 ---
         async function handleTickerSearch(e) {
             const query = e.target.value;
-            if (query.length < 1) {
-                searchResults.style.display = 'none';
-                return;
-            }
-
+            if (query.length < 1) { searchResults.style.display = 'none'; return; }
             const matches = await fetchTickerSearch(query);
-            searchResults.innerHTML = ''; // 이전 결과 지우기
-
+            searchResults.innerHTML = ''; 
             if (!matches || matches.length === 0) {
                 searchResults.innerHTML = `<div class="text-gray-500 italic">검색 결과가 없습니다.</div>`;
                 searchResults.style.display = 'block';
                 return;
             }
-
             matches.forEach(match => {
                 const symbol = match["1. symbol"];
                 const name = match["2. name"];
                 const region = match["4. region"];
-
                 const resultEl = document.createElement('div');
-                resultEl.innerHTML = `
-                    <span class="font-bold">${symbol}</span>
-                    <span class="text-sm text-gray-600 ml-2">(${name}) - ${region}</span>
-                `;
+                resultEl.innerHTML = `<span class="font-bold">${symbol}</span><span class="text-sm text-gray-600 ml-2">(${name}) - ${region}</span>`;
                 resultEl.addEventListener('click', () => {
-                    stockSymbolInput.value = symbol; // 입력창에 티커 채우기
-                    searchResults.style.display = 'none'; // 목록 숨기기
+                    stockSymbolInput.value = symbol; 
+                    searchResults.style.display = 'none'; 
                 });
                 searchResults.appendChild(resultEl);
             });
-
             searchResults.style.display = 'block';
         }
 
         // --- (신규) 디바운스 헬퍼 함수 ---
-        // API 호출을 줄이기 위해 사용자가 타이핑을 멈출 때까지 기다립니다.
         function debounce(func, delay) {
             return function(...args) {
                 clearTimeout(searchDebounceTimer);
@@ -414,13 +388,13 @@
             };
         }
 
-
         // --- 앱 시작 ---
         async function initializeAppLogic() {
-            loadApiKey(); // 로컬 브라우저에서 API 키 로드
-
+            // API 키 로직은 DOMContentLoaded에서 이미 처리됨
+            
             if (!firebaseConfig || !firebaseConfig.apiKey) {
                 showModal("Firebase 설정이 누락되었습니다. 코드의 firebaseConfig 변수를 확인하세요.");
+                hideLoader(); // 로더가 있다면 숨김
                 return;
             }
 
@@ -440,20 +414,17 @@
                         const collectionPath = `users/${userId}/portfolio`;
                         portfolioCollectionRef = collection(db, collectionPath);
                         
-                        // 포트폴리오 실시간 감시
                         const q = query(portfolioCollectionRef);
                         onSnapshot(q, (snapshot) => {
                             hideLoader();
-                            
                             if (snapshot.empty) {
                                 portfolioList.innerHTML = '<p class="text-gray-500 col-span-full">포트폴리오가 비어있습니다. 새 주식을 추가하세요.</p>';
                             }
-
                             snapshot.docChanges().forEach((change) => {
                                 const doc = change.doc;
                                 if (change.type === "added" || change.type === "modified") {
                                     renderPortfolio(doc);
-S                                }
+                                }
                                 if (change.type === "removed") {
                                     const cardToRemove = portfolioList.querySelector(`[data-id="${doc.id}"]`);
                                     if (cardToRemove) cardToRemove.remove();
@@ -469,7 +440,6 @@ S                                }
                         addStockForm.addEventListener('submit', addStock);
 
                     } else {
-                        // 익명으로 로그인 시도
                         console.log("익명 로그인 시도 중...");
                         await signInAnonymously(auth);
                     }
@@ -480,29 +450,36 @@ S                                }
                 });
             } catch (error) {
                 console.error("Firebase 초기화 오류:", error);
-                showModal("앱 초기화 중 심각한 오류가 발생했습니다.");
+                showModal(`Firebase 초기화 오류: ${error.message}. firebaseConfig를 확인하세요.`);
                 hideLoader();
             }
         }
 
         // DOM이 로드된 후 앱 시작
         document.addEventListener('DOMContentLoaded', () => {
+            
+            // *** 수정된 부분 ***
+            // API 키 관련 로직을 Firebase 초기화와 분리하여 먼저 실행합니다.
+            // 이렇게 하면 Firebase 설정이 잘못되어도 API 키 저장은 작동합니다.
+            loadApiKey(); 
+            saveApiKeyButton.addEventListener('click', saveApiKey);
+
+            // 이제 Firebase 및 나머지 앱 로직 초기화 시도
             initializeAppLogic();
             
-            // (신규) 티커 검색 이벤트 리스너 (디바운스 적용)
+            // 티커 검색 이벤트 리스너 (디바운스 적용)
             stockSymbolInput.addEventListener('input', debounce(handleTickerSearch, 300));
 
-            // (신규) 검색창 바깥을 클릭하면 닫기
+            // 검색창 바깥을 클릭하면 닫기
             document.addEventListener('click', (e) => {
                 if (!stockSymbolInput.contains(e.target) && !searchResults.contains(e.target)) {
                     searchResults.style.display = 'none';
                 }
             });
-
-            // (기존) API 키 저장
-            saveApiKeyButton.addEventListener('click', saveApiKey);
+            // *** 수정 끝 ***
         });
 
     </script>
 </body>
 </html>
+
