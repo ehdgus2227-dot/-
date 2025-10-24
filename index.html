@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>클라우드 연동 주식 포트폴리오 (v5.1)</title>
+    <title>클라우드 연동 주식 포트폴리오 (v6 - Finnhub)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -17,12 +17,10 @@
         .signal-hold { color: #6b7280; }
         .loader { border: 4px solid #f3f4f6; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; position: fixed; top: 50%; left: 50%; margin-top: -20px; margin-left: -20px; z-index: 100; display: none; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: none; justify-content: center; align-items: center; z-index: 998; }
-        /* z-index 수정: 근거 모달이 일반 모달 위에 오도록 */
         .modal-content { background: white; padding: 2rem; border-radius: 0.5rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 90%; max-width: 400px; text-align: center; z-index: 999; }
         .rationale-modal-content { background: white; padding: 1.5rem; border-radius: 0.5rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 90%; max-width: 500px; z-index: 1001; }
         
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* 검색 결과 스타일 */
         #searchResults { display: none; }
         #searchResults div {
             @apply px-4 py-2 cursor-pointer hover:bg-gray-100;
@@ -34,15 +32,14 @@
     <div class="max-w-6xl mx-auto">
         <header class="mb-8">
             <h1 class="text-3xl font-bold text-gray-900">클라우드 연동 주식 포트폴리오</h1>
-            <p class="text-gray-600 mt-2">PC와 모바일에서 실시간 동기화됩니다. (v5.1 - Config 적용)</p>
+            <p class="text-gray-600 mt-2">PC와 모바일에서 실시간 동기화됩니다. (v6 - Finnhub API)</p>
         </header>
 
-        <!-- API 키 설정 (이전과 동일) -->
+        <!-- *** 수정됨: API 키 설정 (Finnhub) *** -->
         <div class="card p-6 mb-8">
-            <!-- ... (API 키 HTML은 변경 없음) ... -->
-             <h2 class="text-xl font-semibold mb-4">설정: Alpha Vantage API 키</h2>
+             <h2 class="text-xl font-semibold mb-4">설정: Finnhub.io API 키</h2>
             <p class="text-sm text-gray-600 mb-3">
-                <a href="https://www.alphavantage.co/support/#api-key" target="_blank" class="text-blue-600 hover:underline">무료 API 키 발급</a>
+                <a href="https://finnhub.io/register" target="_blank" class="text-blue-600 hover:underline">무료 API 키 발급</a>
                 (API 키는 PC/모바일 브라우저에 각각 한 번씩 저장해야 합니다.)
             </p>
             <div class="flex gap-4">
@@ -56,13 +53,11 @@
 
         <!-- 포트폴리오 추가 폼 (이전과 동일) -->
         <div class="card p-6 mb-8">
-             <!-- ... (포트폴리오 추가 폼 HTML은 변경 없음) ... -->
              <h2 class="text-xl font-semibold mb-4">새 주식 추가</h2>
              <form id="addStockForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="relative"> <!-- 검색을 위해 relative 추가 -->
+                <div class="relative"> 
                     <label for="stockSymbol" class="block text-sm font-medium text-gray-700">주식 티커 (예: AAPL)</label>
                     <input type="text" id="stockSymbol" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required autocomplete="off">
-                    <!-- 티커 검색 결과 -->
                     <div id="searchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
                         <!-- 검색 결과가 여기에 표시됩니다. -->
                     </div>
@@ -81,27 +76,22 @@
             </form>
         </div>
 
-        <!-- 내 포트폴리오 -->
+        <!-- 내 포트폴리오 (이전과 동일) -->
         <div>
             <h2 class="text-2xl font-semibold mb-4">내 포트폴리오</h2>
             <div id="portfolioList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- 포트폴리오 아이템이 여기에 동적으로 추가됩니다 -->
             </div>
         </div>
     </div>
 
-    <!-- 로딩 스피너 -->
+    <!-- 로더, 모달 (이전과 동일) -->
     <div id="loader" class="loader"></div>
-
-    <!-- 커스텀 메시지 모달 -->
     <div id="messageModal" class="modal-overlay">
         <div class="modal-content">
             <p id="modalMessage" class="text-lg mb-4"></p>
             <button id="closeModal" class="btn btn-primary">확인</button>
         </div>
     </div>
-
-    <!-- 신호 근거 상세 모달 (이전과 동일) -->
     <div id="signalRationaleModal" class="modal-overlay">
         <div class="rationale-modal-content">
             <div class="flex justify-between items-center mb-4">
@@ -109,7 +99,6 @@
                 <button id="closeRationaleModalBtn" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
             </div>
             <div id="rationaleModalBody" class="text-left">
-                <!-- 근거 내용이 여기에 동적으로 삽입됩니다. -->
             </div>
         </div>
     </div>
@@ -117,7 +106,7 @@
 
     <!-- Firebase SDK 및 앱 로직 -->
     <script type="module">
-        // Firebase SDK 임포트 (변경 없음)
+        // Firebase SDK (이전과 동일)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
             getAuth, 
@@ -135,9 +124,7 @@
             setLogLevel
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // =======================================================================
-        // ▼▼▼ 사용자님의 firebaseConfig가 적용되었습니다 ▼▼▼
-        // =======================================================================
+        // *** 수정됨: 사용자님의 Firebase Config (v5.1에서 가져옴) ***
         const firebaseConfig = {
             apiKey: "AIzaSyA9lpUIE3rCTdV51ZEtGH6B5yZr_VVDdT4",
             authDomain: "donghyeon2227.firebaseapp.com",
@@ -147,14 +134,14 @@
             appId: "1:60070026183:web:2ae226006cb3b0b1be57e2",
             measurementId: "G-KT8PVSSHPM"
         };
-        // =======================================================================
 
         // --- 전역 변수 및 DOM 요소 ---
         let app, auth, db, userId, portfolioCollectionRef;
         let userApiKey = null;
-        const apiKeyStorageKey = 'alphaVantageApiKey';
+        // *** 수정됨: API 키 저장소 이름 변경 ***
+        const apiKeyStorageKey = 'finnhubApiKey'; 
         let searchDebounceTimer;
-        let portfolioRationale = {}; // 종목별 신호 근거 저장용 객체
+        let portfolioRationale = {}; 
 
         const addStockForm = document.getElementById('addStockForm');
         const stockSymbolInput = document.getElementById('stockSymbol');
@@ -169,12 +156,10 @@
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveApiKeyButton = document.getElementById('saveApiKeyButton');
 
-        // 근거 모달 DOM 요소
         const signalRationaleModal = document.getElementById('signalRationaleModal');
         const closeRationaleModalBtn = document.getElementById('closeRationaleModalBtn');
         const rationaleModalTitle = document.getElementById('rationaleModalTitle');
         const rationaleModalBody = document.getElementById('rationaleModalBody');
-
 
         // --- 로더, 모달, API 키 관리 (이전과 동일) ---
         function showLoader() { loader.style.display = 'block'; }
@@ -187,11 +172,9 @@
             messageModal.style.display = 'none';
         });
 
-        // 근거 모달 여닫기 함수 (이전과 동일)
+        // 근거 모달 (이전과 동일)
         function showRationaleModal(rationale, symbol) {
             rationaleModalTitle.textContent = `${symbol} 매매 신호 근거`;
-            
-            // 모달 내용(테이블) 생성
             let rationaleHtml = `
                 <p class="text-center mb-4 text-lg">
                     최종 신호: <span class="font-bold ${rationale.signalClass}">${rationale.finalSignal}</span>
@@ -225,7 +208,6 @@
                 </table>
                 <p class="text-xs text-gray-500 mt-4">*주의: 본 신호는 일봉 기준 3가지 보조지표의 기계적 계산 결과이며, 투자 조언이 아닙니다. 실제 매매는 시장 상황, 뉴스, 재무제표 등 복합적인 요소를 고려해야 합니다.</p>
             `;
-            
             rationaleModalBody.innerHTML = rationaleHtml;
             signalRationaleModal.style.display = 'flex';
         }
@@ -233,13 +215,13 @@
             signalRationaleModal.style.display = 'none';
         });
 
-        // (API 키 저장/로드, API 호출 함수들은 변경 없음)
-        function saveApiKey() { /* ... (이전과 동일) ... */ 
+        // API 키 저장/로드 (이전과 동일, 변수 이름만 바뀜)
+        function saveApiKey() { 
             try {
                 const key = apiKeyInput.value.trim();
                 if (key) {
-                    localStorage.setItem(apiKeyStorageKey, key); // 이 시점에서 오류가 날 수 있음 (예: 시크릿 모드)
-                    userApiKey = key; // Updates the global variable
+                    localStorage.setItem(apiKeyStorageKey, key);
+                    userApiKey = key; 
                     showModal("API 키가 저장되었습니다.");
                 } else {
                     showModal("API 키를 입력하세요.");
@@ -249,48 +231,84 @@
                 showModal("API 키를 저장하지 못했습니다. 브라우저가 시크릿 모드는 아닌지 확인해주세요.");
             }
         }
-        function loadApiKey() { /* ... (이전과 동일) ... */ 
+        function loadApiKey() { 
             try {
                 const key = localStorage.getItem(apiKeyStorageKey);
                 if (key) {
                     userApiKey = key;
-                    apiKeyInput.value = key; // Puts the key back in the input box
+                    apiKeyInput.value = key; 
                 }
             } catch (error) {
                 console.warn("API 키 로드 실패:", error);
-                // 로드 실패는 치명적이지 않으므로 모달을 띄우지 않음
             }
         }
-        async function fetchTickerSearch(query) { /* ... (이전과 동일) ... */ 
+
+        // --- *** 수정됨: Finnhub API 호출 함수 *** ---
+
+        /**
+         * Finnhub.io API를 사용한 티커 검색
+         */
+        async function fetchTickerSearch(query) { 
             if (!userApiKey) { console.warn("API 키가 없어 티커 검색을 건너뜁니다."); return null; }
             if (query.length < 1) return null;
-            const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${query}&apikey=${userApiKey}`;
+            
+            const url = `https://finnhub.io/api/v1/search?q=${query}&token=${userApiKey}`;
+            
             try {
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('API 응답 실패');
                 const data = await response.json();
-                if (data["Error Message"] || data["Information"]) { console.warn("티커 검색 API 오류 또는 한도 도달:", data["Error Message"] || data["Information"]); return null; }
-                return data.bestMatches || [];
+                
+                if (data.error) {
+                     console.warn("티커 검색 API 오류:", data.error);
+                     return null;
+                }
+                
+                // Finnhub는 미국 주식만 필터링하는 기능이 약하므로, '.'이 없는 심볼(주로 미국)을 우선 표시
+                const filteredResults = data.result.filter(match => 
+                    !match.symbol.includes('.') && match.type === 'Common Stock'
+                );
+                return filteredResults || [];
+
             } catch (error) {
                 console.error("티커 검색 실패:", error);
                 return null;
             }
         }
-        async function fetchRealStockData(symbol) { /* ... (이전과 동일) ... */ 
-             if (!userApiKey) { showModal("Alpha Vantage API 키를 먼저 '설정'에서 입력하고 저장해주세요."); return null; }
-            const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${userApiKey}`;
+
+        /**
+         * Finnhub.io API를 사용한 주식 데이터 (일봉)
+         */
+        async function fetchRealStockData(symbol) { 
+             if (!userApiKey) { showModal("Finnhub API 키를 먼저 '설정'에서 입력하고 저장해주세요."); return null; }
+
+            // Finnhub은 UNIX 타임스탬프를 사용
+            const toTimestamp = Math.floor(Date.now() / 1000);
+            // 약 100일 전 데이터 (지표 계산을 위해)
+            const fromTimestamp = toTimestamp - (100 * 24 * 60 * 60); 
+
+            const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${fromTimestamp}&to=${toTimestamp}&token=${userApiKey}`;
+            
             try {
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`API 요청 실패: ${response.statusText}`);
+                
                 const data = await response.json();
-                if (data["Error Message"]) throw new Error(`API 오류: ${data["Error Message"]}`);
-                if (data["Information"]) throw new Error("API 호출 한도 도달. 잠시 후 시도하세요.");
-                const timeSeries = data["Time Series (Daily)"];
-                if (!timeSeries) throw new Error("유효한 시계열 데이터가 없습니다.");
-                const latestDate = Object.keys(timeSeries)[0];
-                const latestClosePrice = parseFloat(timeSeries[latestDate]["4. close"]);
-                const historicalPrices = Object.keys(timeSeries).map(date => parseFloat(timeSeries[date]["4. close"])).reverse();
+                
+                if (data.s === 'no_data' || !data.c || data.c.length === 0) {
+                    throw new Error("유효한 시계열 데이터가 없습니다. (Finnhub: no_data)");
+                }
+                
+                if (data.error) {
+                    throw new Error(`API 오류: ${data.error}`);
+                }
+                
+                // Finnhub 응답: data.c (종가 배열), data.h, data.l, data.o, data.t, data.v
+                const historicalPrices = data.c;
+                const latestClosePrice = historicalPrices[historicalPrices.length - 1];
+                
                 return { symbol, currentPrice: latestClosePrice, historicalPrices };
+                
             } catch (error) {
                 console.error(`[${symbol}] 데이터 오류:`, error);
                 showModal(`[${symbol}] 데이터 오류: ${error.message}`);
@@ -298,16 +316,17 @@
             }
         }
 
-
         // --- 기술적 지표 계산 함수 (이전과 동일) ---
-        function calculateSMA(data, period) { /* ... (이전과 동일) ... */ if (data.length < period) return null; return data.slice(-period).reduce((a, b) => a + b, 0) / period; }
-        function calculateEMA(data, period) { /* ... (이전과 동일) ... */ if (data.length < period) return []; const k = 2 / (period + 1); let emaData = [data.slice(0, period).reduce((a, b) => a + b, 0) / period]; for(let i = period; i < data.length; i++) { emaData.push((data[i] * k) + (emaData[emaData.length - 1] * (1 - k))); } return emaData; }
-        function calculateStdDev(data, period) { /* ... (이전과 동일) ... */ const slice = data.slice(-period); if (slice.length < period) return null; const sma = calculateSMA(slice, period); if (sma === null) return null; return Math.sqrt(slice.reduce((a, b) => a + Math.pow(b - sma, 2), 0) / period); }
-        function calculateBollingerBands(data, period = 20, stdDevMultiplier = 2) { /* ... (이전과 동일) ... */ if (data.length < period) return { middle: null, upper: null, lower: null }; const sma = calculateSMA(data, period); const stdDev = calculateStdDev(data, period); if (sma === null || stdDev === null) return { middle: null, upper: null, lower: null }; return { middle: sma, upper: sma + (stdDev * stdDevMultiplier), lower: sma - (stdDev * stdDevMultiplier) }; }
-        function calculateRSI(data, period = 14) { /* ... (이전과 동일) ... */ if (data.length <= period) return null; let gains = 0; let losses = 0; for (let i = data.length - period; i < data.length; i++) { const change = data[i] - data[i-1]; if (change > 0) { gains += change; } else { losses -= change; } } let avgGain = gains / period; let avgLoss = losses / period; if (avgLoss === 0) return 100; const rs = avgGain / avgLoss; return 100 - (100 / (1 + rs)); }
-        function calculateMACD(data, shortPeriod = 12, longPeriod = 26, signalPeriod = 9) { /* ... (이전과 동일) ... */ if (data.length < longPeriod) return { macd: null, signal: null, histogram: null }; const emaShortAll = calculateEMA(data, shortPeriod); const emaLongAll = calculateEMA(data, longPeriod); const macdLineData = emaShortAll.slice(emaShortAll.length - emaLongAll.length).map((val, idx) => val - emaLongAll[idx]); if (macdLineData.length < signalPeriod) return { macd: null, signal: null, histogram: null }; const signalLineData = calculateEMA(macdLineData, signalPeriod); const latestMacd = macdLineData[macdLineData.length - 1]; const latestSignal = signalLineData[signalLineData.length - 1]; return { macd: latestMacd, signal: latestSignal, histogram: latestMacd - latestSignal }; }
+        // (Alpha Vantage와 Finnhub 모두 종가 배열을 반환하므로, 이 함수들은 수정할 필요가 없습니다.)
+        function calculateSMA(data, period) { if (data.length < period) return null; return data.slice(-period).reduce((a, b) => a + b, 0) / period; }
+        function calculateEMA(data, period) { if (data.length < period) return []; const k = 2 / (period + 1); let emaData = [data.slice(0, period).reduce((a, b) => a + b, 0) / period]; for(let i = period; i < data.length; i++) { emaData.push((data[i] * k) + (emaData[emaData.length - 1] * (1 - k))); } return emaData; }
+        function calculateStdDev(data, period) { const slice = data.slice(-period); if (slice.length < period) return null; const sma = calculateSMA(slice, period); if (sma === null) return null; return Math.sqrt(slice.reduce((a, b) => a + Math.pow(b - sma, 2), 0) / period); }
+        function calculateBollingerBands(data, period = 20, stdDevMultiplier = 2) { if (data.length < period) return { middle: null, upper: null, lower: null }; const sma = calculateSMA(data, period); const stdDev = calculateStdDev(data, period); if (sma === null || stdDev === null) return { middle: null, upper: null, lower: null }; return { middle: sma, upper: sma + (stdDev * stdDevMultiplier), lower: sma - (stdDev * stdDevMultiplier) }; }
+        function calculateRSI(data, period = 14) { if (data.length <= period) return null; let gains = 0; let losses = 0; for (let i = data.length - period; i < data.length; i++) { const change = data[i] - data[i-1]; if (change > 0) { gains += change; } else { losses -= change; } } let avgGain = gains / period; let avgLoss = losses / period; if (avgLoss === 0) return 100; const rs = avgGain / avgLoss; return 100 - (100 / (1 + rs)); }
+        function calculateMACD(data, shortPeriod = 12, longPeriod = 26, signalPeriod = 9) { if (data.length < longPeriod) return { macd: null, signal: null, histogram: null }; const emaShortAll = calculateEMA(data, shortPeriod); const emaLongAll = calculateEMA(data, longPeriod); const macdLineData = emaShortAll.slice(emaShortAll.length - emaLongAll.length).map((val, idx) => val - emaLongAll[idx]); if (macdLineData.length < signalPeriod) return { macd: null, signal: null, histogram: null }; const signalLineData = calculateEMA(macdLineData, signalPeriod); const latestMacd = macdLineData[macdLineData.length - 1]; const latestSignal = signalLineData[signalLineData.length - 1]; return { macd: latestMacd, signal: latestSignal, histogram: latestMacd - latestSignal }; }
         
-        // --- getTradingSignal 함수 (이전과 동일) ---
+        // --- getTradingSignal (이전과 동일) ---
+        // (이 함수는 순수하게 가격 배열만 받으므로 수정 불필요)
         function getTradingSignal(stockData) {
             const prices = stockData.historicalPrices;
             const currentPrice = stockData.currentPrice;
@@ -323,8 +342,8 @@
                 recommendation: { type: '관망', price: null }
             };
 
-            if (prices.length < 26) { // 최소 MACD 계산 가능 일수
-                return rationale; // 데이터 부족 상태의 기본 'rationale' 반환
+            if (!prices || prices.length < 26) { // 최소 MACD 계산 가능 일수
+                return rationale; 
             }
 
             let recommendedAction = { type: 'N/A', price: null };
@@ -397,7 +416,8 @@
         }
 
 
-        // --- renderPortfolio 함수 (이전과 동일) ---
+        // --- renderPortfolio (이전과 동일) ---
+        // (API 호출 부분이 추상화되어 있으므로 수정 불필요)
         async function renderPortfolio(doc) {
             const stock = doc.data();
             const stockId = doc.id;
@@ -409,7 +429,6 @@
             let cardHtml;
 
             if (!stockData || stockData.error) {
-                // (오류 시 카드 HTML은 동일)
                 cardHtml = `
                     <button class="absolute top-3 right-3 text-gray-400 hover:text-red-500 font-bold remove-stock" data-id="${stockId}">X</button>
                     <h3 class="text-xl font-bold text-red-700">${stock.symbol.toUpperCase()}</h3>
@@ -418,11 +437,9 @@
                 `;
             } else {
                 const tradingSignal = getTradingSignal(stockData);
-                // 종목의 신호 근거를 전역 객체에 저장
                 portfolioRationale[stockId] = tradingSignal;
                 
                 const currentPrice = stockData.currentPrice;
-                // (계산 로직은 동일)
                 const totalValue = currentPrice * stock.quantity;
                 const purchaseValue = stock.purchasePrice * stock.quantity;
                 const gainLoss = totalValue - purchaseValue;
@@ -433,7 +450,6 @@
                     <button class="absolute top-3 right-3 text-gray-400 hover:text-red-500 font-bold remove-stock" data-id="${stockId}">X</button>
                     <h3 class="text-xl font-bold text-blue-700">${stock.symbol.toUpperCase()}</h3>
                     <p class="text-sm text-gray-500 mb-4">수량: ${stock.quantity}</p>
-                    <!-- ... (평가손익 등 이전과 동일) ... -->
                     <div class="space-y-2 mb-4">
                         <div class="flex justify-between"><span class="text-gray-600">평균 매수가:</span><span class="font-medium">$${stock.purchasePrice.toFixed(2)}</span></div>
                         <div class="flex justify-between"><span class="text-gray-600">현재가 (전일 종가):</span><span class="font-medium">$${currentPrice.toFixed(2)}</span></div>
@@ -443,8 +459,6 @@
                     <div class="border-t pt-4 space-y-2">
                         <div class="flex justify-between items-center">
                             <span class="text-gray-600">매매 신호 (일봉):</span>
-                            
-                            <!-- 근거 보기 버튼 -->
                             <div classs="text-right">
                                 <span class="font-bold text-lg ${tradingSignal.signalClass}">${tradingSignal.finalSignal}</span>
                                 <button class="rationale-button ml-1 text-xs text-blue-600 hover:underline focus:outline-none" data-stock-id="${stockId}">(근거 보기)</button>
@@ -471,13 +485,11 @@
             }
             card.innerHTML = cardHtml;
             
-            // 삭제 버튼 리스너
             card.querySelector('.remove-stock').addEventListener('click', (e) => {
                 e.stopPropagation();
                 removeStock(e.target.dataset.id);
             });
 
-            // 근거 보기 버튼 리스너 (오류 카드가 아닐 때만 추가)
             if (stockData && !stockData.error) {
                 card.querySelector('.rationale-button').addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -491,7 +503,7 @@
         }
 
         // --- Firestore 상호작용 (이전과 동일) ---
-        async function addStock(e) { /* ... (이전과 동일) ... */ 
+        async function addStock(e) { 
             e.preventDefault();
             if (!userId) { showModal("데이터베이스에 연결되지 않았습니다. 잠시 후 다시 시도하세요."); return; }
             if (!userApiKey) { showModal("API 키를 먼저 설정하고 저장해주세요."); return; }
@@ -506,7 +518,6 @@
                 const testData = await fetchRealStockData(symbol);
                 if (!testData || testData.error) { 
                     hideLoader(); 
-                    // fetchRealStockData 내부에서 이미 오류 모달을 띄웁니다.
                     return; 
                 }
 
@@ -519,7 +530,6 @@
                 });
                 console.log("주식 추가 성공, Doc ID:", docRef.id);
                 
-                // 폼 초기화
                 stockSymbolInput.value = '';
                 stockQuantityInput.value = '';
                 purchasePriceInput.value = '';
@@ -531,7 +541,7 @@
                 hideLoader();
             }
         }
-        async function removeStock(id) { /* ... (이전과 동일) ... */ 
+        async function removeStock(id) { 
             if (!window.confirm("정말로 이 주식을 포트폴리오에서 삭제하시겠습니까?")) return;
             showLoader();
             try {
@@ -546,23 +556,26 @@
             }
         }
         
-        // --- 티커 검색 핸들러 (이전과 동일) ---
-        async function handleTickerSearch(e) { /* ... (이전과 동일) ... */ 
+        // --- *** 수정됨: 티커 검색 핸들러 (Finnhub) *** ---
+        async function handleTickerSearch(e) { 
             const query = e.target.value;
             if (query.length < 1) { searchResults.style.display = 'none'; return; }
+            
             const matches = await fetchTickerSearch(query);
+            
             searchResults.innerHTML = ''; 
             if (!matches || matches.length === 0) {
                 searchResults.innerHTML = `<div class="text-gray-500 italic">검색 결과가 없습니다.</div>`;
                 searchResults.style.display = 'block';
                 return;
             }
-            matches.forEach(match => {
-                const symbol = match["1. symbol"];
-                const name = match["2. name"];
-                const region = match["4. region"];
+            
+            matches.slice(0, 10).forEach(match => { // 상위 10개만 표시
+                const symbol = match.symbol;
+                const description = match.description; // Finnhub는 'name' 대신 'description'
+                
                 const resultEl = document.createElement('div');
-                resultEl.innerHTML = `<span class="font-bold">${symbol}</span><span class="text-sm text-gray-600 ml-2">(${name}) - ${region}</span>`;
+                resultEl.innerHTML = `<span class="font-bold">${symbol}</span><span class="text-sm text-gray-600 ml-2">(${description})</span>`;
                 resultEl.addEventListener('click', () => {
                     stockSymbolInput.value = symbol; 
                     searchResults.style.display = 'none'; 
@@ -571,7 +584,7 @@
             });
             searchResults.style.display = 'block';
         }
-        function debounce(func, delay) { /* ... (이전과 동일) ... */ 
+        function debounce(func, delay) { 
             return function(...args) {
                 clearTimeout(searchDebounceTimer);
                 searchDebounceTimer = setTimeout(() => {
@@ -581,14 +594,11 @@
         }
 
         // --- 앱 시작 (이전과 동일) ---
-        async function initializeAppLogic() { /* ... (이전과 동일) ... */ 
-            // API 키 로직은 DOMContentLoaded에서 이미 처리됨
-            
-            // firebaseConfig 유효성 검사
+        async function initializeAppLogic() { 
             if (!firebaseConfig || !firebaseConfig.apiKey || !firebaseConfig.projectId) {
                 console.error("Firebase 설정이 누락되었습니다.", firebaseConfig);
                 showModal("Firebase 설정이 누락되었습니다. 코드의 firebaseConfig 변수를 확인하세요.");
-                hideLoader(); // 로더가 있다면 숨김
+                hideLoader(); 
                 return;
             }
 
@@ -596,7 +606,7 @@
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                // setLogLevel('Debug'); // Firestore 로그 레벨 설정
+                // setLogLevel('Debug'); 
 
                 showLoader();
 
@@ -605,11 +615,9 @@
                         userId = user.uid;
                         console.log("익명 인증 성공, UserId:", userId);
                         
-                        // users/{userId}/portfolio 경로 설정
                         const collectionPath = `users/${userId}/portfolio`;
                         portfolioCollectionRef = collection(db, collectionPath);
                         
-                        // 실시간 스냅샷 리스너 설정
                         const q = query(portfolioCollectionRef);
                         onSnapshot(q, (snapshot) => {
                             hideLoader();
@@ -617,15 +625,12 @@
                                 portfolioList.innerHTML = '<p class="text-gray-500 col-span-full">포트폴리오가 비어있습니다. 새 주식을 추가하세요.</p>';
                             }
                             
-                            // 문서 변경 사항 처리
                             snapshot.docChanges().forEach((change) => {
                                 const doc = change.doc;
                                 if (change.type === "added" || change.type === "modified") {
-                                    // console.log("데이터 변경 감지 (추가/수정):", doc.data());
                                     renderPortfolio(doc);
                                 }
                                 if (change.type === "removed") {
-                                    // console.log("데이터 변경 감지 (삭제):", doc.id);
                                     const cardToRemove = portfolioList.querySelector(`[data-id="${doc.id}"]`);
                                     if (cardToRemove) cardToRemove.remove();
                                 }
@@ -636,13 +641,10 @@
                             hideLoader();
                         });
 
-                        // 폼 제출 리스너 (인증 성공 후 한 번만 등록)
-                        // 이전에 등록된 리스너가 있다면 제거 (중복 방지)
                         addStockForm.removeEventListener('submit', addStock); 
                         addStockForm.addEventListener('submit', addStock);
 
                     } else {
-                        // 사용자가 로그인되어 있지 않으면 익명 로그인 시도
                         console.log("익명 로그인 시도 중...");
                         await signInAnonymously(auth);
                     }
@@ -653,27 +655,21 @@
                 });
             } catch (error) {
                 console.error("Firebase 초기화 오류:", error);
-                // firebaseConfig를 문자열로 변환하여 로그에 포함 (민감 정보 주의)
-                // console.error("사용된 Config:", JSON.stringify(firebaseConfig));
                 showModal(`Firebase 초기화 오류: ${error.message}. firebaseConfig 값을 다시 확인하세요.`);
                 hideLoader();
             }
         }
 
-        // --- DOMContentLoaded 리스너 (이전과 동일) ---
-        document.addEventListener('DOMContentLoaded', () => { /* ... (이전과 동일) ... */ 
+        // --- DOMContentLoaded (이전과 동일) ---
+        document.addEventListener('DOMContentLoaded', () => { 
             
-            // API 키 관련 로직을 Firebase 초기화와 분리하여 먼저 실행합니다.
             loadApiKey(); 
             saveApiKeyButton.addEventListener('click', saveApiKey);
 
-            // 이제 Firebase 및 나머지 앱 로직 초기화 시도
             initializeAppLogic();
             
-            // 티커 검색 이벤트 리스너 (디바운스 적용)
             stockSymbolInput.addEventListener('input', debounce(handleTickerSearch, 300));
 
-            // 검색창 바깥을 클릭하면 닫기
             document.addEventListener('click', (e) => {
                 if (!stockSymbolInput.contains(e.target) && !searchResults.contains(e.target)) {
                     searchResults.style.display = 'none';
