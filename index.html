@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>클라우드 연동 주식 포트폴리오 (v5)</title>
+    <title>클라우드 연동 주식 포트폴리오 (v5.1)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -34,7 +34,7 @@
     <div class="max-w-6xl mx-auto">
         <header class="mb-8">
             <h1 class="text-3xl font-bold text-gray-900">클라우드 연동 주식 포트폴리오</h1>
-            <p class="text-gray-600 mt-2">PC와 모바일에서 실시간 동기화됩니다. (v5 - 신호 근거 표시)</p>
+            <p class="text-gray-600 mt-2">PC와 모바일에서 실시간 동기화됩니다. (v5.1 - Config 적용)</p>
         </header>
 
         <!-- API 키 설정 (이전과 동일) -->
@@ -101,7 +101,7 @@
         </div>
     </div>
 
-    <!-- *** 신규: 신호 근거 상세 모달 *** -->
+    <!-- 신호 근거 상세 모달 (이전과 동일) -->
     <div id="signalRationaleModal" class="modal-overlay">
         <div class="rationale-modal-content">
             <div class="flex justify-between items-center mb-4">
@@ -136,18 +136,16 @@
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =======================================================================
-        // ▼▼▼ Firebase 콘솔에서 복사한 firebaseConfig 내용을 여기에 붙여넣으세요 ▼▼▼
+        // ▼▼▼ 사용자님의 firebaseConfig가 적용되었습니다 ▼▼▼
         // =======================================================================
         const firebaseConfig = {
-           apiKey: "AIzaSyA9lpUIE3rCTdV51ZEtGH6B5yZr_VVDdT4",
-  authDomain: "donghyeon2227.firebaseapp.com",
-  projectId: "donghyeon2227",
-  storageBucket: "donghyeon2227.firebasestorage.app",
-  messagingSenderId: "60070026183",
-  appId: "1:60070026183:web:2ae226006cb3b0b1be57e2",
-  measurementId: "G-KT8PVSSHPM"   // apiKey: "...",
-            // authDomain: "...",
-            // ... (사용자님의 설정 붙여넣기) ...
+            apiKey: "AIzaSyA9lpUIE3rCTdV51ZEtGH6B5yZr_VVDdT4",
+            authDomain: "donghyeon2227.firebaseapp.com",
+            projectId: "donghyeon2227",
+            storageBucket: "donghyeon2227.firebasestorage.app",
+            messagingSenderId: "60070026183",
+            appId: "1:60070026183:web:2ae226006cb3b0b1be57e2",
+            measurementId: "G-KT8PVSSHPM"
         };
         // =======================================================================
 
@@ -156,20 +154,29 @@
         let userApiKey = null;
         const apiKeyStorageKey = 'alphaVantageApiKey';
         let searchDebounceTimer;
-        let portfolioRationale = {}; // *** 신규: 종목별 신호 근거 저장용 객체
+        let portfolioRationale = {}; // 종목별 신호 근거 저장용 객체
 
         const addStockForm = document.getElementById('addStockForm');
-        // ... (이전 DOM 요소들) ...
+        const stockSymbolInput = document.getElementById('stockSymbol');
+        const stockQuantityInput = document.getElementById('stockQuantity');
+        const purchasePriceInput = document.getElementById('purchasePrice');
+        const portfolioList = document.getElementById('portfolioList');
+        const loader = document.getElementById('loader');
+        const messageModal = document.getElementById('messageModal');
+        const modalMessage = document.getElementById('modalMessage');
+        const closeModal = document.getElementById('closeModal');
+        const searchResults = document.getElementById('searchResults');
+        const apiKeyInput = document.getElementById('apiKeyInput');
         const saveApiKeyButton = document.getElementById('saveApiKeyButton');
 
-        // *** 신규: 근거 모달 DOM 요소 ***
+        // 근거 모달 DOM 요소
         const signalRationaleModal = document.getElementById('signalRationaleModal');
         const closeRationaleModalBtn = document.getElementById('closeRationaleModalBtn');
         const rationaleModalTitle = document.getElementById('rationaleModalTitle');
         const rationaleModalBody = document.getElementById('rationaleModalBody');
 
 
-        // --- 로더, 모달, API 키 관리 ---
+        // --- 로더, 모달, API 키 관리 (이전과 동일) ---
         function showLoader() { loader.style.display = 'block'; }
         function hideLoader() { loader.style.display = 'none'; }
         function showModal(message) {
@@ -180,7 +187,7 @@
             messageModal.style.display = 'none';
         });
 
-        // *** 신규: 근거 모달 여닫기 함수 ***
+        // 근거 모달 여닫기 함수 (이전과 동일)
         function showRationaleModal(rationale, symbol) {
             rationaleModalTitle.textContent = `${symbol} 매매 신호 근거`;
             
@@ -300,7 +307,7 @@
         function calculateRSI(data, period = 14) { /* ... (이전과 동일) ... */ if (data.length <= period) return null; let gains = 0; let losses = 0; for (let i = data.length - period; i < data.length; i++) { const change = data[i] - data[i-1]; if (change > 0) { gains += change; } else { losses -= change; } } let avgGain = gains / period; let avgLoss = losses / period; if (avgLoss === 0) return 100; const rs = avgGain / avgLoss; return 100 - (100 / (1 + rs)); }
         function calculateMACD(data, shortPeriod = 12, longPeriod = 26, signalPeriod = 9) { /* ... (이전과 동일) ... */ if (data.length < longPeriod) return { macd: null, signal: null, histogram: null }; const emaShortAll = calculateEMA(data, shortPeriod); const emaLongAll = calculateEMA(data, longPeriod); const macdLineData = emaShortAll.slice(emaShortAll.length - emaLongAll.length).map((val, idx) => val - emaLongAll[idx]); if (macdLineData.length < signalPeriod) return { macd: null, signal: null, histogram: null }; const signalLineData = calculateEMA(macdLineData, signalPeriod); const latestMacd = macdLineData[macdLineData.length - 1]; const latestSignal = signalLineData[signalLineData.length - 1]; return { macd: latestMacd, signal: latestSignal, histogram: latestMacd - latestSignal }; }
         
-        // --- *** 수정됨: getTradingSignal 함수 (근거 반환) *** ---
+        // --- getTradingSignal 함수 (이전과 동일) ---
         function getTradingSignal(stockData) {
             const prices = stockData.historicalPrices;
             const currentPrice = stockData.currentPrice;
@@ -390,7 +397,7 @@
         }
 
 
-        // --- *** 수정됨: renderPortfolio 함수 (근거 보기 버튼 추가) *** ---
+        // --- renderPortfolio 함수 (이전과 동일) ---
         async function renderPortfolio(doc) {
             const stock = doc.data();
             const stockId = doc.id;
@@ -411,7 +418,7 @@
                 `;
             } else {
                 const tradingSignal = getTradingSignal(stockData);
-                // *** 신규: 종목의 신호 근거를 전역 객체에 저장
+                // 종목의 신호 근거를 전역 객체에 저장
                 portfolioRationale[stockId] = tradingSignal;
                 
                 const currentPrice = stockData.currentPrice;
@@ -437,7 +444,7 @@
                         <div class="flex justify-between items-center">
                             <span class="text-gray-600">매매 신호 (일봉):</span>
                             
-                            <!-- *** 수정됨: 근거 보기 버튼 추가 *** -->
+                            <!-- 근거 보기 버튼 -->
                             <div classs="text-right">
                                 <span class="font-bold text-lg ${tradingSignal.signalClass}">${tradingSignal.finalSignal}</span>
                                 <button class="rationale-button ml-1 text-xs text-blue-600 hover:underline focus:outline-none" data-stock-id="${stockId}">(근거 보기)</button>
@@ -470,7 +477,7 @@
                 removeStock(e.target.dataset.id);
             });
 
-            // *** 신규: 근거 보기 버튼 리스너 (오류 카드가 아닐 때만 추가) ***
+            // 근거 보기 버튼 리스너 (오류 카드가 아닐 때만 추가)
             if (stockData && !stockData.error) {
                 card.querySelector('.rationale-button').addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -495,20 +502,31 @@
             
             showLoader();
             try {
+                // API 호출로 티커 유효성 검사
                 const testData = await fetchRealStockData(symbol);
-                if (!testData || testData.error) { hideLoader(); return; }
-                await addDoc(portfolioCollectionRef, {
+                if (!testData || testData.error) { 
+                    hideLoader(); 
+                    // fetchRealStockData 내부에서 이미 오류 모달을 띄웁니다.
+                    return; 
+                }
+
+                // Firestore에 문서 추가
+                const docRef = await addDoc(portfolioCollectionRef, {
                     symbol: symbol,
                     quantity: quantity,
                     purchasePrice: price,
                     userId: userId 
                 });
+                console.log("주식 추가 성공, Doc ID:", docRef.id);
+                
+                // 폼 초기화
                 stockSymbolInput.value = '';
                 stockQuantityInput.value = '';
                 purchasePriceInput.value = '';
+
             } catch (error) {
-                console.error("주식 추가 오류:", error);
-                showModal("주식 추가 중 오류가 발생했습니다.");
+                console.error("주식 추가 오류 (addStock 함수):", error);
+                showModal(`주식 추가 중 오류가 발생했습니다: ${error.message}`);
             } finally {
                 hideLoader();
             }
@@ -566,7 +584,9 @@
         async function initializeAppLogic() { /* ... (이전과 동일) ... */ 
             // API 키 로직은 DOMContentLoaded에서 이미 처리됨
             
-            if (!firebaseConfig || !firebaseConfig.apiKey) {
+            // firebaseConfig 유효성 검사
+            if (!firebaseConfig || !firebaseConfig.apiKey || !firebaseConfig.projectId) {
+                console.error("Firebase 설정이 누락되었습니다.", firebaseConfig);
                 showModal("Firebase 설정이 누락되었습니다. 코드의 firebaseConfig 변수를 확인하세요.");
                 hideLoader(); // 로더가 있다면 숨김
                 return;
@@ -576,7 +596,7 @@
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                setLogLevel('Debug');
+                // setLogLevel('Debug'); // Firestore 로그 레벨 설정
 
                 showLoader();
 
@@ -585,54 +605,65 @@
                         userId = user.uid;
                         console.log("익명 인증 성공, UserId:", userId);
                         
+                        // users/{userId}/portfolio 경로 설정
                         const collectionPath = `users/${userId}/portfolio`;
                         portfolioCollectionRef = collection(db, collectionPath);
                         
+                        // 실시간 스냅샷 리스너 설정
                         const q = query(portfolioCollectionRef);
                         onSnapshot(q, (snapshot) => {
                             hideLoader();
                             if (snapshot.empty) {
                                 portfolioList.innerHTML = '<p class="text-gray-500 col-span-full">포트폴리오가 비어있습니다. 새 주식을 추가하세요.</p>';
                             }
+                            
+                            // 문서 변경 사항 처리
                             snapshot.docChanges().forEach((change) => {
                                 const doc = change.doc;
                                 if (change.type === "added" || change.type === "modified") {
+                                    // console.log("데이터 변경 감지 (추가/수정):", doc.data());
                                     renderPortfolio(doc);
                                 }
                                 if (change.type === "removed") {
+                                    // console.log("데이터 변경 감지 (삭제):", doc.id);
                                     const cardToRemove = portfolioList.querySelector(`[data-id="${doc.id}"]`);
                                     if (cardToRemove) cardToRemove.remove();
                                 }
                             });
                         }, (error) => {
                             console.error("onSnapshot 오류:", error);
-                            showModal("포트폴리오 로딩 중 오류 발생.");
+                            showModal(`포트폴리오 로딩 중 오류 발생: ${error.message}`);
                             hideLoader();
                         });
 
-                        // 인증이 완료된 후에 폼 제출 리스너 추가
+                        // 폼 제출 리스너 (인증 성공 후 한 번만 등록)
+                        // 이전에 등록된 리스너가 있다면 제거 (중복 방지)
+                        addStockForm.removeEventListener('submit', addStock); 
                         addStockForm.addEventListener('submit', addStock);
 
                     } else {
+                        // 사용자가 로그인되어 있지 않으면 익명 로그인 시도
                         console.log("익명 로그인 시도 중...");
                         await signInAnonymously(auth);
                     }
                 }, (error) => {
                     console.error("Auth 상태 변경 오류:", error);
-                    showModal("인증 중 오류가 발생했습니다.");
+                    showModal(`인증 중 오류가 발생했습니다: ${error.message}`);
                     hideLoader();
                 });
             } catch (error) {
                 console.error("Firebase 초기화 오류:", error);
-                showModal(`Firebase 초기화 오류: ${error.message}. firebaseConfig를 확인하세요.`);
+                // firebaseConfig를 문자열로 변환하여 로그에 포함 (민감 정보 주의)
+                // console.error("사용된 Config:", JSON.stringify(firebaseConfig));
+                showModal(`Firebase 초기화 오류: ${error.message}. firebaseConfig 값을 다시 확인하세요.`);
                 hideLoader();
             }
         }
+
+        // --- DOMContentLoaded 리스너 (이전과 동일) ---
         document.addEventListener('DOMContentLoaded', () => { /* ... (이전과 동일) ... */ 
             
-            // *** 수정된 부분 ***
             // API 키 관련 로직을 Firebase 초기화와 분리하여 먼저 실행합니다.
-            // 이렇게 하면 Firebase 설정이 잘못되어도 API 키 저장은 작동합니다.
             loadApiKey(); 
             saveApiKeyButton.addEventListener('click', saveApiKey);
 
@@ -648,7 +679,6 @@
                     searchResults.style.display = 'none';
                 }
             });
-            // *** 수정 끝 ***
         });
 
     </script>
