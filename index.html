@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>클라우드 연동 주식 포트폴리오</title>
+    <title>클라우드 연동 주식 포트폴리오 (v3)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -19,6 +19,11 @@
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: none; justify-content: center; align-items: center; z-index: 998; }
         .modal-content { background: white; padding: 2rem; border-radius: 0.5rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 90%; max-width: 400px; text-align: center; z-index: 999; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* 검색 결과 스타일 */
+        #searchResults { display: none; }
+        #searchResults div {
+            @apply px-4 py-2 cursor-pointer hover:bg-gray-100;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -26,7 +31,7 @@
     <div class="max-w-6xl mx-auto">
         <header class="mb-8">
             <h1 class="text-3xl font-bold text-gray-900">클라우드 연동 주식 포트폴리오</h1>
-            <p class="text-gray-600 mt-2">PC와 모바일에서 실시간 동기화됩니다.</p>
+            <p class="text-gray-600 mt-2">PC와 모바일에서 실시간 동기화됩니다. (v3 - 검색 기능)</p>
         </header>
 
         <!-- API 키 설정 -->
@@ -46,9 +51,13 @@
         <div class="card p-6 mb-8">
              <h2 class="text-xl font-semibold mb-4">새 주식 추가</h2>
              <form id="addStockForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
+                <div class="relative"> <!-- 검색을 위해 relative 추가 -->
                     <label for="stockSymbol" class="block text-sm font-medium text-gray-700">주식 티커 (예: AAPL)</label>
-                    <input type="text" id="stockSymbol" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required>
+                    <input type="text" id="stockSymbol" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required autocomplete="off">
+                    <!-- 티커 검색 결과 -->
+                    <div id="searchResults" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                        <!-- 검색 결과가 여기에 표시됩니다. -->
+                    </div>
                 </div>
                 <div>
                     <label for="stockQuantity" class="block text-sm font-medium text-gray-700">보유 수량</label>
@@ -108,19 +117,13 @@
         // ▼▼▼ 1단계에서 복사한 firebaseConfig 내용을 여기에 붙여넣으세요 ▼▼▼
         // =======================================================================
         const firebaseConfig = {
-            apiKey: "AIzaSyA9lpUIE3rCTdV51ZEtGH6B5yZr_VVDdT4",
-    authDomain: "donghyeon2227.firebaseapp.com",
-    projectId: "donghyeon2227",
-    storageBucket: "donghyeon2227.firebasestorage.app",
-    messagingSenderId: "60070026183",
-    appId: "1:60070026183:web:2ae226006cb3b0b1be57e2",
-    measurementId: "G-KT8PVSSHPM"// apiKey: "...",
+            // apiKey: "...",
             // authDomain: "...",
             // projectId: "...",
             // storageBucket: "...",
             // messagingSenderId: "...",
             // appId: "..."
-            // 여기에 붙여넣기
+            // 여기에 본인의 Firebase Config를 붙여넣으세요
         };
         // =======================================================================
 
@@ -128,12 +131,14 @@
         let app, auth, db, userId, portfolioCollectionRef;
         let userApiKey = null;
         const apiKeyStorageKey = 'alphaVantageApiKey'; // API 키는 로컬 브라우저에 저장
+        let searchDebounceTimer; // 티커 검색용 디바운스 타이머
 
         const addStockForm = document.getElementById('addStockForm');
         const stockSymbolInput = document.getElementById('stockSymbol');
         const stockQuantityInput = document.getElementById('stockQuantity');
         const purchasePriceInput = document.getElementById('purchasePrice');
         const portfolioList = document.getElementById('portfolioList');
+        const searchResults = document.getElementById('searchResults'); // 검색 결과 div
         const loader = document.getElementById('loader');
         const messageModal = document.getElementById('messageModal');
         const modalMessage = document.getElementById('modalMessage');
@@ -171,7 +176,34 @@
             }
         }
 
-        // --- Alpha Vantage API 호출 (이전과 동일) ---
+        // --- Alpha Vantage API 호출 ---
+
+        // (신규) 티커 검색 API
+        async function fetchTickerSearch(query) {
+            if (!userApiKey) {
+                // 이 함수는 조용히 실패 (모달 팝업 없음)
+                console.warn("API 키가 없어 티커 검색을 건너뜁니다.");
+                return null;
+            }
+            if (query.length < 1) return null;
+
+            const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${query}&apikey=${userApiKey}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('API 응답 실패');
+                const data = await response.json();
+                if (data["Error Message"] || data["Information"]) {
+                     console.warn("티커 검색 API 오류 또는 한도 도달:", data["Error Message"] || data["Information"]);
+                     return null; // 오류 시 조용히 실패
+                }
+                return data.bestMatches || [];
+            } catch (error) {
+                console.error("티커 검색 실패:", error);
+                return null;
+            }
+        }
+
+        // (기존) 일일 데이터 API
         async function fetchRealStockData(symbol) {
             if (!userApiKey) {
                 showModal("Alpha Vantage API 키를 먼저 '설정'에서 입력하고 저장해주세요.");
@@ -216,7 +248,8 @@
             const stock = doc.data();
             const stockId = doc.id;
             
-            showLoader(); // 데이터 가져오기 시작
+            // 주식 데이터를 가져오는 동안 로더를 표시
+            showLoader(); 
             const stockData = await fetchRealStockData(stock.symbol);
             hideLoader(); // 데이터 가져오기 완료
 
@@ -245,12 +278,22 @@
                     <div class="space-y-2 mb-4">
                         <div class="flex justify-between"><span class="text-gray-600">평균 매수가:</span><span class="font-medium">$${stock.purchasePrice.toFixed(2)}</span></div>
                         <div class="flex justify-between"><span class="text-gray-600">현재가 (전일 종가):</span><span class="font-medium">$${currentPrice.toFixed(2)}</span></div>
-                        <div class="flex justify-between"><span class="text-gray-600">평가손익:</span><span class="font-medium ${gainLossClass}">$${gainLoss.toFixed(2)} (${gainLossPercent.toFixed(2)}%)</span></div>
-                        <div class="flex justify-between"><span class="text-gray-600">총 평가금액:</span><span class="font-medium">$${totalValue.toFixed(2)}</span></div>
+                        <div class="flex justify-between"><span class="font-semibold text-gray-700">평가손익:</span><span class="font-semibold ${gainLossClass}">$${gainLoss.toFixed(2)} (${gainLossPercent.toFixed(2)}%)</span></div>
+                        <div class="flex justify-between"><span class="font-semibold text-gray-700">총 평가금액:</span><span class="font-semibold">$${totalValue.toFixed(2)}</span></div>
                     </div>
-                    <div class="border-t pt-4">
-                        <div class="flex justify-between items-center mb-2"><span class="text-gray-600">매매 신호 (일봉):</span><span class="font-bold text-lg ${tradingSignal.signalClass}">${tradingSignal.signal}</span></div>
-                        <div class="flex justify-between text-sm"><span class="text-gray-600">추천 행동 (${tradingSignal.recommendation.type}):</span><span class="font-medium">${tradingSignal.recommendation.price ? '$' + tradingSignal.recommendation.price : 'N/A'}</span></div>
+                    <div class="border-t pt-4 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">매매 신호 (일봉):</span>
+                            <span class="font-bold text-lg ${tradingSignal.signalClass}">${tradingSignal.signal}</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">추천 행동:</span>
+                            <span class="font-medium text-right">${tradingSignal.recommendation.type}</span>
+                        </div>
+                         <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">추천 가격 (참고):</span>
+                            <span class="font-medium">${tradingSignal.recommendation.price ? '$' + tradingSignal.recommendation.price : 'N/A'}</span>
+                        </div>
                     </div>
                 `;
             }
@@ -323,6 +366,55 @@
             }
         }
 
+        // --- (신규) 티커 검색 핸들러 ---
+        async function handleTickerSearch(e) {
+            const query = e.target.value;
+            if (query.length < 1) {
+                searchResults.style.display = 'none';
+                return;
+            }
+
+            const matches = await fetchTickerSearch(query);
+            searchResults.innerHTML = ''; // 이전 결과 지우기
+
+            if (!matches || matches.length === 0) {
+                searchResults.innerHTML = `<div class="text-gray-500 italic">검색 결과가 없습니다.</div>`;
+                searchResults.style.display = 'block';
+                return;
+            }
+
+            matches.forEach(match => {
+                const symbol = match["1. symbol"];
+                const name = match["2. name"];
+                const region = match["4. region"];
+
+                const resultEl = document.createElement('div');
+                resultEl.innerHTML = `
+                    <span class="font-bold">${symbol}</span>
+                    <span class="text-sm text-gray-600 ml-2">(${name}) - ${region}</span>
+                `;
+                resultEl.addEventListener('click', () => {
+                    stockSymbolInput.value = symbol; // 입력창에 티커 채우기
+                    searchResults.style.display = 'none'; // 목록 숨기기
+                });
+                searchResults.appendChild(resultEl);
+            });
+
+            searchResults.style.display = 'block';
+        }
+
+        // --- (신규) 디바운스 헬퍼 함수 ---
+        // API 호출을 줄이기 위해 사용자가 타이핑을 멈출 때까지 기다립니다.
+        function debounce(func, delay) {
+            return function(...args) {
+                clearTimeout(searchDebounceTimer);
+                searchDebounceTimer = setTimeout(() => {
+                    func.apply(this, args);
+                }, delay);
+            };
+        }
+
+
         // --- 앱 시작 ---
         async function initializeAppLogic() {
             loadApiKey(); // 로컬 브라우저에서 API 키 로드
@@ -345,8 +437,6 @@
                         userId = user.uid;
                         console.log("익명 인증 성공, UserId:", userId);
                         
-                        // 사용자별 고유 컬렉션 경로
-                        // 중요: 이 경로는 Canvas 환경과 다릅니다. (더 간단함)
                         const collectionPath = `users/${userId}/portfolio`;
                         portfolioCollectionRef = collection(db, collectionPath);
                         
@@ -359,12 +449,11 @@
                                 portfolioList.innerHTML = '<p class="text-gray-500 col-span-full">포트폴리오가 비어있습니다. 새 주식을 추가하세요.</p>';
                             }
 
-                            // 변경사항 감지
                             snapshot.docChanges().forEach((change) => {
                                 const doc = change.doc;
                                 if (change.type === "added" || change.type === "modified") {
                                     renderPortfolio(doc);
-                                }
+S                                }
                                 if (change.type === "removed") {
                                     const cardToRemove = portfolioList.querySelector(`[data-id="${doc.id}"]`);
                                     if (cardToRemove) cardToRemove.remove();
@@ -376,6 +465,7 @@
                             hideLoader();
                         });
 
+                        // 인증이 완료된 후에 폼 제출 리스너 추가
                         addStockForm.addEventListener('submit', addStock);
 
                     } else {
@@ -396,7 +486,23 @@
         }
 
         // DOM이 로드된 후 앱 시작
-        document.addEventListener('DOMContentLoaded', initializeAppLogic);
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeAppLogic();
+            
+            // (신규) 티커 검색 이벤트 리스너 (디바운스 적용)
+            stockSymbolInput.addEventListener('input', debounce(handleTickerSearch, 300));
+
+            // (신규) 검색창 바깥을 클릭하면 닫기
+            document.addEventListener('click', (e) => {
+                if (!stockSymbolInput.contains(e.target) && !searchResults.contains(e.target)) {
+                    searchResults.style.display = 'none';
+                }
+            });
+
+            // (기존) API 키 저장
+            saveApiKeyButton.addEventListener('click', saveApiKey);
+        });
+
     </script>
 </body>
 </html>
